@@ -1,9 +1,23 @@
 <template>
-    <p v-if="data">data1:{{ data.previousData }}</p>
-    <!-- <button style="position: relative;" @click="GetData">按我按我</button>-->
-    <button @click="GetRiding1">1出发</button>
-    <button @click="GetRiding2">2出发</button>
-    <div id="allmap"></div>
+    <div class="common-layout">
+        <el-container>
+            <el-aside width="15vh">
+                <button @click="GetRiding1">1出发</button>
+                <button @click="GetRiding2">2出发</button>
+                <button @click="GetLocation">华为云测试</button>
+            </el-aside>
+            <el-container style="padding-top: 0%;">
+                <el-main style="height:90vh;">
+                    <div id="allmap" style="width: 100%;height: 100%;position: relative;"></div>
+                </el-main>
+                <el-footer>
+                    <el-progress :percentage="percentage" :stroke-width="12" striped striped-flow>
+                        <span>time</span>
+                    </el-progress>
+                </el-footer>
+            </el-container>
+        </el-container>
+    </div>
 </template>
 
 <script setup>
@@ -11,6 +25,8 @@ import { ref, reactive, onMounted } from 'vue'
 import { RodeArray, PointSets, MarkerSets, LabelSets } from "../points.js"
 import { getPoints, GetSteps, DriveCar } from "../tools.js"
 import axios from 'axios'
+
+const percentage = ref(10)
 
 var map = null
 //创建规划对象

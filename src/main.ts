@@ -1,6 +1,6 @@
 import { createApp } from "vue";
 import App from "./App.vue";
-import BMap from "./components/BMap.vue"
+
 
 // import "~/styles/element/index.scss";
 
