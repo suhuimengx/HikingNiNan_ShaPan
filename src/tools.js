@@ -11,8 +11,8 @@ export function getPoints(prevPoint, newPoint, num) {
     var dlng; //经度增量
     var stepPoints = [];
 
-    dlat = (newPoint.lat - prevPoint.lat) / num;
-    dlng = (newPoint.lng - prevPoint.lng) / num;
+    dlat = (newPoint.lat - prevPoint.lat) / (num + 1);
+    dlng = (newPoint.lng - prevPoint.lng) / (num + 1);
     stepPoints[0] = prevPoint;
     for (let i = 1; i < num; i++) {
         let new_lng = prevPoint.lng + dlng * i;
@@ -80,3 +80,58 @@ export function DriveCar(stepPoints, car_id, map, freq) {
         }
     }, Math.round(1000 / freq));
 }
+
+export function ComputeRotation(prevPoint, newPoint, map) {
+    var prevPixel = map.pointToPixel(prevPoint)
+    var newPixel = map.pointToPixel(newPoint)
+    var dy = newPixel.y - prevPixel.y
+    var dx = newPixel.x - prevPixel.x
+    var angle = Math.atan2(dy, dx)
+    if (0 <= angle && angle <= 90) {
+        return (90 - angle)
+    }
+    if (-180 <= angle && angle < 0) {
+        return (-angle + 90)
+    }
+    if (90 < angle && angle <= 180) {
+        return (450 - angle)
+    }
+}
+
+export function MoveMapCenter(marker1, marker2, marker3) {
+    var lng1 = marker1.getPosition().lng, lng2 = marker2.getPosition().lng, lng3 = marker3.getPosition().lng
+    var lat1 = marker1.getPosition().lat, lat2 = marker2.getPosition().lat, lat3 = marker3.getPosition().lat
+    var centerPoint = new BMapGL.Point((lng1 + lng2 + lng3) / 3, (lat1 + lat2 + lat3) / 3)
+    return centerPoint
+}
+
+/****************执行路径*******************/
+// const GetRiding1 = () => {
+//     //注意！路径规划是异步执行的，所以逻辑需要在回调中实现
+//     const walking1 = new BMapGL.WalkingRoute(map, {
+//         onSearchComplete: (res) => {
+//             let routes = res.getPlan(0)._routes[0]
+//             //获取关键转弯点
+//             stepArray1 = routes._steps
+//             //获取全部中间点
+//             routeArray1 = routes._points
+//             //百度api的数据获取完成，阔以开始运动了
+//             flag1 = true
+//         }
+//     })
+//     var start = PointSets[2];
+//     var end = PointSets[9];
+//     walking1.search(start, end);
+//     let stepPoints = []
+//     if (flag1) {
+//         console.log(stepArray1)
+//         let speed = 50; //速度   m/s
+//         let freq = 5;   //点频率 点/s
+//         let distribution = Math.round(speed / freq)  //点分布 m/点
+//         /*************获取路径点********************/
+//         stepPoints = GetSteps(stepArray1, distribution, start, end)
+//         console.log(stepPoints)
+//         //获取路径点后，运行车辆
+//         DriveCar(stepPoints, 1, map, freq)
+//     }
+// }

@@ -2,148 +2,55 @@
     <div class="common-layout">
         <el-container>
             <!-- 左侧部分 -->
-            <el-aside width="38vh">
+            <el-aside width="17vh" style="margin-top: 0%;">
                 <div class="test-button">
-                    <button @click="SocketConnect">socket connect</button>
-                    <button @click="SocketDisconnect">socket disconnect</button>
-                    <button @click="GetData">华为云测试</button>
+                    <button @click="SocketConnect">connect</button>
+                    <button @click="SocketDisconnect">disconnect</button>
+                    <button @click="test">reset</button>
                 </div>
-                <div class="timeline-container">
-                    <el-timeline class="timeline">
-                        <el-timeline-item v-for="(activity, index) in activities" :key="index"
-                            :timestamp="activity.timestamp">
-                            {{ activity.content }}</el-timeline-item>
-                    </el-timeline>
-                    <el-timeline class="timeline">
-                        <el-timeline-item v-for="(activity, index) in activities" :key="index"
-                            :timestamp="activity.timestamp">
-                            {{ activity.content }}</el-timeline-item>
-                    </el-timeline>
-                    <el-timeline class="timeline">
-                        <el-timeline-item v-for="(activity, index) in activities" :key="index"
-                            :timestamp="activity.timestamp">
-                            {{ activity.content }}</el-timeline-item>
-                    </el-timeline>
-
-                </div>
-                <div class="box-card">
-                    <el-card>
-                        <template #header>
-                            <div class="card-header">
-                                <span>智慧园区车辆状态</span>
-                                <!-- <el-button class="button" text>Operation button</el-button> -->
-                            </div>
-                        </template>
-                        <div>
-                            <el-table :data="car_status">
-                                <el-table-column prop="car_id" label="车辆编号"></el-table-column>
-                                <el-table-column prop="PassengerNum" label="载客量"></el-table-column>
-                                <el-table-column prop="TravlledDistance" label="行驶里程"></el-table-column>
-                            </el-table>
-                        </div>
-                    </el-card>
-                </div>
-                <div id="gdmap" style="width: 100%;height: 40vh;position: relative;"></div>
-                <p>{{ real_location }}</p>
             </el-aside>
             <!-- 主体地图部分 -->
-            <el-container style="padding-top: 0%;height: 100vh;">
+            <el-container style="padding-top: 0%;height: 100vh;padding-left: 100px;">
                 <el-main>
-                    <div id="allmap" style="width: 100%;height: 100%;position: relative;"></div>
+                    <div id="allmap">
+                        <div class="car car0" :style="car0style">
+                        </div>
+                        <div class="car car1" :style="car1style">
+                        </div>
+                        <div class="passenger_car" v-if="isPassenger0Visible" :class="{ 'blink': isPassenger0Visible }"
+                            :style="passenger0style"></div>
+                        <div class="passenger_car" v-if="isPassenger1Visible" :class="{ 'blink': isPassenger1Visible }"
+                            :style="passenger1style"></div>
+
+                        <div class="passenger" v-if="car0_passenger1" :class="{ 'blink': car0_passenger1 }"
+                            :style="car0_passengerStyle1"></div>
+                        <div class="passenger" v-if="car0_passenger2" :class="{ 'blink': car0_passenger2 }"
+                            :style="car0_passengerStyle2"></div>
+                        <div class="passenger" v-if="car1_passenger1" :class="{ 'blink': car1_passenger1 }"
+                            :style="car1_passengerStyle1"></div>
+                        <div class="passenger" v-if="car1_passenger2" :class="{ 'blink': car1_passenger2 }"
+                            :style="car1_passengerStyle2"></div>
+                    </div>
                 </el-main>
-                <!-- 底部时间轴 -->
-                <el-footer>
-                    <el-progress :percentage="percentage" :stroke-width="12" striped striped-flow>
-                        <span>time</span>
-                    </el-progress>
-                </el-footer>
             </el-container>
         </el-container>
     </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
-import { RodeArray, PointSets, MarkerSets, LabelSets } from "../points.js"
-import { getPoints, GetSteps, DriveCar } from "../tools.js"
-import axios from 'axios'
-import styleJson from '/src/assets/map_style2.json'
+import { ref, reactive, onMounted, computed } from 'vue'
+import { ElNotification, ElMessage } from 'element-plus'
 import io from 'socket.io-client'
 
-const percentage = ref(10)
-const real_location = ref(0)
-var huawei_token = ""
+const percentage = ref(0)
+const real_time = ref("7:20:00")
 
 var socket = null
-var map = null
-var gdmap = null
-var marker_gd = null
-var passedPolyline = null
-var lushu = null
-//创建规划对象
-var routeArray1 = null   //全部中间节点
-var stepArray1 = null    //step对象数组
-var flag1 = false
-//创建规划对象
-var routeArray2 = null   //全部中间节点
-var stepArray2 = null    //step对象数组
-var flag2 = false
+var MarkerCar_01 = null
+var MarkerCar_02 = null
+var insert1_flag = true
+var insert2_flag = true
 
-const SocketConnect = () => {
-    var icon = new BMapGL.Icon("src/assets/bus1.png", new BMapGL.Size(25, 25))
-    var MarkerCar = new BMapGL.Marker(PointSets[0], { icon: icon });
-    map.addOverlay(MarkerCar)
-    socket = io("http://localhost:5000/")
-    socket.on('connect', () => {
-        console.log('websocket connected...')
-    })
-    socket.on('send_message', (res) => {
-        var temp_array = res.location_array
-        var temp_array_gd = res.location_array_amap
-        car_status.value[0].PassengerNum = res.PassengerNum
-        console.log(res)
-        var duration_gd = 500
-        var waitTime = (temp_array_gd.length / 2 * 500) | 0
-        marker_gd.moveAlong(temp_array_gd, {
-            //每一段的时长
-            duration: duration_gd,
-            autoRotation: true,
-        })
-        //车辆运行一半时间后，开始cover乘客图标
-        setTimeout(() => {
-            var passengerMarker = new AMap.Marker({
-                map: gdmap,
-                position: temp_array_gd[temp_array_gd.length - 1],
-                icon: new AMap.Icon({
-                    size: new AMap.Size(32, 32),
-                    image: "/src/assets/person.png",
-                    imageSize: new AMap.Size(32, 32),
-                    imageOffset: new AMap.Pixel(0, 0),
-                })
-            })
-            gdmap.add(passengerMarker)
-            setTimeout(() => {
-                gdmap.remove(passengerMarker)
-            }, waitTime + 600);
-        }, waitTime);
-
-    })
-    socket.on('send_location', (res) => {
-        // console.log(res)
-        let prevPoint = MarkerCar.getPosition()
-        let lng = res[0], lat = res[1]
-        let tempPoint = new BMapGL.Point(lng, lat)
-        let patharray = getPoints(prevPoint, tempPoint, 10)
-        let index = 1, length = patharray.length
-        let smoothTimer = setInterval(() => {
-            if (index >= length) {
-                clearInterval(smoothTimer)
-                MarkerCar.setPosition(tempPoint)
-            }
-            if (index < length - 1) MarkerCar.setPosition(patharray[index++])
-        }, 56);
-    })
-}
 const SocketDisconnect = () => {
     if (socket) {
         socket.disconnect()
@@ -151,147 +58,334 @@ const SocketDisconnect = () => {
     console.log('websocket disconnected...')
 }
 
-var activities = [
-    {
-        content: '接到一位乘客',
-        timestamp: '7:30',
-    },
-    {
-        content: '一位乘客下车',
-        timestamp: '7:38',
-    },
-    {
-        content: '一位乘客下车',
-        timestamp: '7:41',
-    },
-]
-const car_status = ref([
-    { car_id: "car_01", PassengerNum: 0, TravlledDistance: 100 },
-    { car_id: "car_02", PassengerNum: 0, TravlledDistance: 100 },
-    { car_id: "car_03", PassengerNum: 0, TravlledDistance: 100 },
-])
-
-/****************执行路径*******************/
-const GetRiding1 = () => {
-    //注意！路径规划是异步执行的，所以逻辑需要在回调中实现
-    const walking1 = new BMapGL.WalkingRoute(map, {
-        onSearchComplete: (res) => {
-            let routes = res.getPlan(0)._routes[0]
-            //获取关键转弯点
-            stepArray1 = routes._steps
-            //获取全部中间点
-            routeArray1 = routes._points
-            //百度api的数据获取完成，阔以开始运动了
-            flag1 = true
-        }
-    })
-    var start = PointSets[2];
-    var end = PointSets[9];
-    walking1.search(start, end);
-    let stepPoints = []
-    if (flag1) {
-        console.log(stepArray1)
-        let speed = 50; //速度   m/s
-        let freq = 5;   //点频率 点/s
-        let distribution = Math.round(speed / freq)  //点分布 m/点
-        /*************获取路径点********************/
-        stepPoints = GetSteps(stepArray1, distribution, start, end)
-        console.log(stepPoints)
-        //获取路径点后，运行车辆
-        DriveCar(stepPoints, 1, map, freq)
+const test = () => {
+    let carId = 1;
+    let end_id = 12;
+    let point_position = realTimeOrder_Position[end_id];
+    if (carId == 0) {
+        passenger0style.value.left = point_position[0] + 'px';
+        passenger0style.value.top = point_position[1] + 'px';
+        // 开始闪烁乘客图标
+        isPassenger0Visible.value = true;
+        // 3s后停止闪烁
+        setTimeout(() => {
+            isPassenger0Visible.value = false;
+        }, 3000);
+    }
+    else if (carId == 1) {
+        passenger1style.value.left = point_position[0] + 'px';
+        passenger1style.value.top = point_position[1] + 'px';
+        // 开始闪烁乘客图标
+        isPassenger1Visible.value = true;
+        // 3s后停止闪烁
+        setTimeout(() => {
+            isPassenger1Visible.value = false;
+        }, 3000);
     }
 }
+
+
+//上车点的坐标
+const realTimeOrder_Position = [
+    [0, 0],      //[y,x]
+    //[35, 485],   //1号点
+    //[192, 547],  //2号点
+    //[170, 397],  //3号点
+    //[171, 335],  //4号点
+    //[21, 386],   //5号点
+    //[68, 21],    //6号点
+    //[382, 22],   //7号点
+    //[170, 21],   //8号点
+    //[217, 330],  //9号点
+    //[547, 228],  //10号点
+    //[306, 547],  //11号点
+    //[547, 547],  //12号点
+
+    [494, -16],   //1号点
+    [555, 177],  //2号点
+    [484, 177],  //3号点
+    [341, 127],  //4号点
+    [396, -47],   //5号点
+    [39, -44],    //6号点
+    [75, 267],   //7号点
+    [-39, 145],   //8号点
+    [326, 150],  //9号点
+    [282, 519],  //10号点
+    [530, 324],  //11号点
+    [589, 521],  //12号点
+]
+
+const car0_passengerStyle1 = ref({
+    left: '0px',
+    top: '0px',
+})
+const car0_passengerStyle2 = ref({
+    left: '0px',
+    top: '0px',
+})
+const car1_passengerStyle1 = ref({
+    left: '0px',
+    top: '0px',
+})
+const car1_passengerStyle2 = ref({
+    left: '0px',
+    top: '0px',
+})
+
+const passenger0style = ref({
+    left: '0px',
+    top: '0px',
+})
+const passenger1style = ref({
+    left: '0px',
+    top: '0px',
+})
+
+const car0_position = ref({
+    pos_y: 80,
+    pos_x: 547,
+})
+const car1_position = ref({
+    pos_y: 300,
+    pos_x: 22,
+})
+
+const car0_passenger1 = ref(false)
+const car0_passenger2 = ref(false)
+const car1_passenger1 = ref(false)
+const car1_passenger2 = ref(false)
+
+const isPassenger0Visible = ref(false)
+const isPassenger1Visible = ref(false)
+
+
+const reset = () => {
+    car0_passenger1.value = false;
+    car0_passenger2.value = false;
+    car1_passenger1.value = false;
+    car1_passenger2.value = false;
+}
+
+/*计算属性实时更新车辆位置*/
+const car0style = computed(() => {
+    return {
+        left: `${car0_position.value.pos_y - 12}px`,
+        top: `${car0_position.value.pos_x - 12}px`,
+    }
+})
+const car1style = computed(() => {
+    return {
+        left: `${car1_position.value.pos_y - 12}px`,
+        top: `${car1_position.value.pos_x - 12}px`,
+    }
+})
+
+const getDistance = (x1, y1, x2, y2) => {
+    var dx = x2 - x1;
+    var dy = y2 - y1;
+    var distance = Math.sqrt(dx * dx + dy * dy);
+    return distance;
+}
+
+/* 与python后台服务 */
+const SocketConnect = () => {
+    socket = io("http://localhost:5000/")
+    socket.on('connect', () => {
+        console.log('websocket connected...')
+    })
+    /**检测乘客上下车动作 */
+    socket.on('send_message_arrive', (res) => {
+        console.log(res)
+        let carId = res.car_id;
+        let end_id = res.arrive_id;
+        let point_position = realTimeOrder_Position[end_id];
+        if (carId == 0) {
+            passenger0style.value.left = point_position[0] + 'px';
+            passenger0style.value.top = point_position[1] + 'px';
+            // 开始闪烁乘客图标
+            isPassenger0Visible.value = true;
+            // 3s后停止闪烁
+            setTimeout(() => {
+                isPassenger0Visible.value = false;
+            }, 4000);
+        }
+        else if (carId == 1) {
+            passenger1style.value.left = point_position[0] + 'px';
+            passenger1style.value.top = point_position[1] + 'px';
+            // 开始闪烁乘客图标
+            isPassenger1Visible.value = true;
+            // 3s后停止闪烁
+            setTimeout(() => {
+                isPassenger1Visible.value = false;
+            }, 4000);
+        }
+
+    })
+    /**监测并显示实时订单 */
+    socket.on('send_message_realTimeOrder', (res) => {
+        console.log(res);
+        let carId = res.car_id;
+        let text = `一个实时订单分配给${carId}号小车`;
+        let start_id = res.originId;
+        let end_id = res.destId;
+        ElMessage({
+            message: text,
+            type: 'warning',
+            offset: 400,
+            center: true,
+            duration: 8000,
+        })
+        // 在实时订单上下车点显示乘客图标
+        let start_position = realTimeOrder_Position[start_id]
+        let end_position = realTimeOrder_Position[end_id]
+        if (carId == 0) {
+            car0_passengerStyle1.value.left = start_position[0] + 'px';
+            car0_passengerStyle1.value.top = start_position[1] + 'px';
+            car0_passengerStyle2.value.left = end_position[0] + 'px';
+            car0_passengerStyle2.value.top = end_position[1] + 'px';
+            //开始闪烁乘客图标
+            car0_passenger1.value = true;
+            car0_passenger2.value = true;
+            //4s后停止闪烁
+            setTimeout(() => {
+                car0_passenger1.value = false;
+                car0_passenger2.value = false;
+            }, 4000);
+        }
+        else if (carId == 1) {
+            car0_passengerStyle1.value.left = start_position[0] + 'px';
+            car0_passengerStyle1.value.top = start_position[1] + 'px';
+            car0_passengerStyle2.value.left = end_position[0] + 'px';
+            car0_passengerStyle2.value.top = end_position[1] + 'px';
+            //开始闪烁乘客图标
+            car1_passenger1.value = true;
+            car1_passenger2.value = true;
+            //4s后停止闪烁
+            setTimeout(() => {
+                car1_passenger1.value = false;
+                car1_passenger2.value = false;
+            }, 4000);
+        }
+    })
+    /**刷新车辆实时位置 */
+    socket.on('send_message_location', (res) => {
+        console.log({
+            "tagid0": res.id0,
+            "tagid1": res.id1,
+        })
+        /*刷新车辆位置*/
+        car0_position.value.pos_x = res.posx0;
+        car0_position.value.pos_y = res.posy0;
+        car1_position.value.pos_x = res.posx1;
+        car1_position.value.pos_y = res.posy1;
+    })
+
+}
+
 /*************初始化页面*********** */
 onMounted(() => {
-    //初始化地图
-    map = new BMapGL.Map("allmap")
-    map.enableScrollWheelZoom();
-    map.centerAndZoom(new BMapGL.Point(118.965069, 32.120852), 19);
-    map.setMapStyleV2({
-        // styleId:"a480e565a09dfa2adfdbeb6622602504"
-        styleJson: styleJson
-    })
-    map.setHeading(108);
-    map.setTilt(34);
-    // //显示点标记
-    // for (let marker of MarkerSets) {
-    //     map.addOverlay(marker);
-    // }
-    //显示标签
-    for (let label of LabelSets) {
-        map.addOverlay(label);
-    }
 
-    gdmap = new AMap.Map("gdmap", {
-        resizeEnable: true,
-        center: [118.951742391866, 32.123405409006],
-        zoom: 20,
-        pitch: 55.94919957310569,
-        rotation: -0.7908261543741522,
-        viewMode: '3D', //开启3D视图,默认为关闭
-        buildingAnimation: true, //楼块出现是否带动画
-    })
-
-    passedPolyline = new AMap.Polyline({
-        map: gdmap,
-        showDir: true,
-        strokeColor: "#28F", //线颜色
-        strokeWeight: 6, //线宽
-    });
-    let icon_gd = new AMap.Icon({
-        size: new AMap.Size(26, 52),
-        image: "https://a.amap.com/jsapi_demos/static/demo-center-v2/car.png",
-        imageSize: new AMap.Size(26, 52),
-        imageOffset: new AMap.Pixel(0, 0),
-    })
-    marker_gd = new AMap.Marker({
-        map: gdmap,
-        // position: new AMap.LngLat(118.951742391866,32.123405409006),
-        position: [118.951742391866, 32.123405409006],
-        icon: icon_gd,
-        offset: new AMap.Pixel(-13, -26),
-    });
-    gdmap.add(marker_gd)
-    marker_gd.on('moving', function (e) {
-        passedPolyline.setPath(e.passedPath);
-        // 设置地图中心点
-        gdmap.setCenter(e.target.getPosition())
-        // 设置旋转角
-        gdmap.setRotation(-e.target.getOrientation())
-    });
-
-    gdmap.setFitView();
-    AMap.plugin('AMap.MoveAnimation', () => {
-        console.log("动画插件加载完毕")
-    })
 })
 </script>
 
 <style>
 #allmap {
-    width: 100%;
-    height: 100%;
+    width: 570px;
+    height: 570px;
+    /* background-image: url('https://img1.imgtp.com/2023/08/06/W4kfVNW4.svg'); */
+    background-image: url('src/assets/map_dis.svg');
+    background-repeat: no-repeat;
+    background-size: 100% 100%;
     position: relative;
-    z-index: 10;
     /* overflow: hidden; */
 }
 
+
+.car-tag {
+    display: flex;
+    justify-content: space-between;
+    margin-left: 15%;
+    margin-right: 6%;
+    margin-top: 0;
+}
+
+.passenger {
+    position: absolute;
+    background-size: contain;
+    width: 35px;
+    height: 35px;
+    background-image: url("src/assets/hail.png");
+}
+
+.passenger_car {
+    position: absolute;
+    background-size: contain;
+    width: 35px;
+    height: 35px;
+    background-image: url("src/assets/passenger.png");
+}
+
+.label {
+    position: absolute;
+    top: 50%;
+    /* 将标签垂直居中 */
+    left: 40px;
+    /* 调整标签与图标之间的距离 */
+    transform: translateY(-50%);
+    /* 垂直居中 */
+    background-color: #fff;
+    padding: 1px 3px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    white-space: nowrap;
+    /* 防止标语换行 */
+}
+
+.car {
+    position: absolute;
+    width: 36px;
+    height: 36px;
+    background-size: contain;
+}
+
+.car0 {
+    background-image: url("src/assets/bus1.png");
+}
+
+.car1 {
+    background-image: url("src/assets/bus2.png");
+}
+
+@keyframes blink {
+    0% {
+        opacity: 0;
+    }
+
+    100% {
+        opacity: 1;
+    }
+}
+
+.blink {
+    animation: blink 0.3s alternate infinite;
+}
+
 .test-button {
-    padding-bottom: 5vh;
+    padding-bottom: 1vh;
 }
 
 .timeline-container {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    grid-template-rows: repeat(2, 1fr);
-    grid-gap: 10px;
+    grid-template-columns: repeat(3, 1fr);
+    /* grid-template-rows: repeat(2, 1fr); */
+    grid-gap: 8px;
     max-height: 70vh;
     overflow: auto;
 }
 
 .timeline {
     /* border: 1px solid #ccc; */
-    padding: 4px;
+    padding: 3px;
 
 }
 
@@ -303,5 +397,4 @@ onMounted(() => {
 .card-content {
     font-size: 14px;
     margin-bottom: 1vh;
-}
-</style>
+}</style>
